@@ -28,13 +28,13 @@ def extract_features(signal, sr=700):
     filtered = sosfiltfilt(SOS, signal)
 
     feats = {
-        "mean": np.mean(filtered),
-        "std": np.std(filtered),
-        "max": np.max(filtered),
-        "min": np.min(filtered),
-        "range": np.max(filtered) - np.min(filtered),
-        "rms": np.sqrt(np.mean(filtered**2)),
-        "slope": np.polyfit(range(len(filtered)), filtered, 1)[0]
+        "mean": float(np.mean(filtered)),
+        "std": float(np.std(filtered)),
+        "max": float(np.max(filtered)),
+        "min": float(np.min(filtered)),
+        "range": float(np.max(filtered) - np.min(filtered)),
+        "rms": float(np.sqrt(np.mean(filtered**2))),
+        "slope": float(np.polyfit(range(len(filtered)), filtered, 1)[0])
     }
 
     peaks, _ = find_peaks(filtered, distance=sr*0.3)
@@ -42,11 +42,11 @@ def extract_features(signal, sr=700):
 
     if len(peaks) > 1:
         intervals = np.diff(peaks) / sr
-        feats["breathing_rate"] = 60 / np.mean(intervals)
-        feats["breathing_rate_std"] = 60 * np.std(intervals)
+        feats["breathing_rate"] = float(60 / np.mean(intervals))
+        feats["breathing_rate_std"] = float(60 * np.std(intervals))
     else:
-        feats["breathing_rate"] = 0
-        feats["breathing_rate_std"] = 0
+        feats["breathing_rate"] = 0.0
+        feats["breathing_rate_std"] = 0.0
 
     inhale_times, exhale_times, depths = [], [], []
     for i in range(min(len(peaks)-1, len(troughs))):
@@ -55,11 +55,10 @@ def extract_features(signal, sr=700):
             exhale_times.append((peaks[i+1] - troughs[i]) / sr)
             depths.append(filtered[peaks[i]] - filtered[troughs[i]])
 
-    feats["avg_inhale_time"] = np.mean(inhale_times) if inhale_times else 0
-    feats["avg_exhale_time"] = np.mean(exhale_times) if exhale_times else 0
-    feats["avg_depth"] = np.mean(depths) if depths else 0
-    feats["inhale_exhale_ratio"] = (feats["avg_inhale_time"] / feats["avg_exhale_time"]
-                                    if feats["avg_exhale_time"] > 0 else 0)
+    feats["avg_inhale_time"] = float(np.mean(inhale_times)) if inhale_times else 0.0
+    feats["avg_exhale_time"] = float(np.mean(exhale_times)) if exhale_times else 0.0
+    feats["avg_depth"] = float(np.mean(depths)) if depths else 0.0
+    feats["inhale_exhale_ratio"] = float(feats["avg_inhale_time"] / feats["avg_exhale_time"]) if feats["avg_exhale_time"] > 0 else 0.0
 
     fft_vals = fft(filtered)
     freqs = fftfreq(len(filtered), 1/sr)
@@ -68,45 +67,44 @@ def extract_features(signal, sr=700):
     fft_freq = freqs[pos]
 
     if len(fft_mag) > 0:
-        feats["dominant_frequency"] = fft_freq[np.argmax(fft_mag)]
-        feats["spectral_energy"] = np.sum(fft_mag**2)
-        feats["spectral_entropy"] = -np.sum(
-            (fft_mag / np.sum(fft_mag)) * np.log2(fft_mag / np.sum(fft_mag) + 1e-10)
-        )
+        feats["dominant_frequency"] = float(fft_freq[np.argmax(fft_mag)])
+        feats["spectral_energy"] = float(np.sum(fft_mag**2))
+        feats["spectral_entropy"] = float(-np.sum((fft_mag / np.sum(fft_mag)) * np.log2(fft_mag / np.sum(fft_mag) + 1e-10)))
         band = (fft_freq >= 0.1) & (fft_freq <= 0.35)
-        feats["resp_band_power"] = np.sum(fft_mag[band]**2) if np.any(band) else 0
+        feats["resp_band_power"] = float(np.sum(fft_mag[band]**2)) if np.any(band) else 0.0
     else:
-        feats["dominant_frequency"] = 0
-        feats["spectral_energy"] = 0
-        feats["spectral_entropy"] = 0
-        feats["resp_band_power"] = 0
+        feats["dominant_frequency"] = 0.0
+        feats["spectral_energy"] = 0.0
+        feats["spectral_entropy"] = 0.0
+        feats["resp_band_power"] = 0.0
 
     return feats
 
 LABEL_MAP = {1: "Baseline", 2: "Stress", 3: "Amusement"}
 
 st.sidebar.header("Input")
-mode = st.sidebar.radio("Choose input mode", ["Demo (synthetic)", "Upload .npy"])
+mode = st.sidebar.radio("Choose input mode", ["Demo (real WESAD sample)", "Upload .npy"])
 
 signal = None
+demo_class = None
 
-if mode == "Demo (synthetic)":
-    emotion_choice = st.sidebar.selectbox("Simulate emotion", ["Baseline", "Stress", "Amusement"])
-    params = {
-        "Baseline": (21, 2.0, 0.05),
-        "Stress": (14, 1.2, 0.08),
-        "Amusement": (19, 1.8, 0.06)
-    }
-    rate, depth, noise = params[emotion_choice]
-    t = np.linspace(0, 60, 700*60)
-    signal = depth * np.sin(2 * np.pi * (rate/60) * t) + np.random.normal(0, noise, len(t))
-    st.info(f"Simulated signal for: {emotion_choice} (rate={rate} bpm)")
+if mode == "Demo (real WESAD sample)":
+    demo_class = st.sidebar.selectbox("Pick a real WESAD window", ["Baseline", "Stress", "Amusement"])
+    
+    file_map = {"Baseline": "wesad_sample_1.npy", "Stress": "wesad_sample_2.npy", "Amusement": "wesad_sample_3.npy"}
+    fname = file_map[demo_class]
+    
+    if os.path.exists(fname):
+        signal = np.load(fname).flatten()
+        st.info(f"Loaded real WESAD window for: {demo_class}")
+    else:
+        st.error(f"Missing file: {fname}")
 
 else:
     uploaded = st.sidebar.file_uploader("Upload respiration signal (.npy, 700Hz)", type=["npy"])
     if uploaded is not None:
         signal = np.load(uploaded).flatten()
-        st.success(f"Loaded signal: {signal.shape[0]} samples ({signal.shape[0]/700:.1f}s)")
+        st.success(f"Loaded: {signal.shape[0]} samples ({signal.shape[0]/700:.1f}s)")
 
 if signal is not None:
     st.subheader("Signal preview")
@@ -134,4 +132,4 @@ if signal is not None:
             st.bar_chart(prob_df.set_index("Emotion"))
 
             with st.expander("Extracted features"):
-                st.json({k: float(v) for k, v in feats.items()})
+                st.json(feats)
