@@ -72,4 +72,3 @@ Schmidt et al. (2018). Introducing WESAD, a multimodal dataset for wearable stre
 
 ## License
 
-For academic and educational use only.
