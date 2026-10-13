@@ -1,0 +1,17 @@
+mean
+std
+max
+min
+range
+rms
+slope
+breathing_rate
+breathing_rate_std
+avg_inhale_time
+avg_exhale_time
+avg_depth
+inhale_exhale_ratio
+dominant_frequency
+spectral_energy
+spectral_entropy
+resp_band_power
